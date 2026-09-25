@@ -108,11 +108,19 @@ export default function Register() {
   const downloadPass = async (url: string) => {
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Unable to download pass.');
+      if (!response.ok) throw new Error('Unable to download pass directly.');
       const blob = await response.blob();
-      downloadBlob(blob, url.split('/').pop() ?? 'attendee-pass.jpg');
-    } catch (error) {
-      setErrors({ general: 'Could not download pass. Please try again later.' });
+      downloadBlob(blob, `attendee-pass-${registrationResult?.participant_id || 'pass'}.jpg`);
+    } catch {
+      // Fallback if CORS prevents blob fetch: trigger direct download/view via anchor
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = `attendee-pass-${registrationResult?.participant_id || 'pass'}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   };
 
