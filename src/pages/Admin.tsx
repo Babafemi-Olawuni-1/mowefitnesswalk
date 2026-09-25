@@ -213,11 +213,15 @@ export default function AdminPage() {
       setSponsorNotice({ tone: 'success', text: 'Sponsor saved.' });
       await fetchSponsors();
     } catch (e) {
-      setSponsorNotice({
-        tone: 'error',
-        text: e instanceof Error ? e.message : 'Unable to create sponsor',
-      });
-      setError(e instanceof Error ? e.message : 'Unable to create sponsor');
+      const message =
+        e instanceof ApiError && e.errors
+          ? Object.values(e.errors).join(' ')
+          : e instanceof Error
+            ? e.message
+            : 'Unable to create sponsor';
+
+      setSponsorNotice({ tone: 'error', text: message });
+      setError(message);
     } finally {
       setSponsorSaving(false);
     }

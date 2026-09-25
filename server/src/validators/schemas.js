@@ -87,6 +87,14 @@ const optionalUrl = z
   .string()
   .trim()
   .max(500)
+  .transform((value) => {
+    // Accept a bare host like "www.example.com" and assume https, so a
+    // sponsor's website is not rejected for a missing protocol.
+    if (value && !/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+      return `https://${value}`;
+    }
+    return value;
+  })
   .refine((value) => value === '' || /^https?:\/\//i.test(value), 'Must be a valid http(s) URL.')
   .optional()
   .or(z.literal(''));
