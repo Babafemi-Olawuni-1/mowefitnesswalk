@@ -25,7 +25,7 @@ export function getPool() {
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    ssl: config.DATABASE_URL.includes('sslmode') || config.isProduction
+    ssl: config.DATABASE_URL.includes('supabase') || config.DATABASE_URL.includes('sslmode') || config.isProduction
       ? { rejectUnauthorized: false }
       : undefined,
   });
