@@ -53,6 +53,8 @@ export default function AdminPage() {
   const [priority, setPriority] = useState('0');
   const [status, setStatus] = useState('active');
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [sponsorSaving, setSponsorSaving] = useState(false);
+  const [sponsorNotice, setSponsorNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [galleryCaption, setGalleryCaption] = useState('');
@@ -183,7 +185,7 @@ export default function AdminPage() {
     if (!token) return;
 
     if (!businessName.trim()) {
-      setError('Business name is required.');
+      setSponsorNotice({ tone: 'error', text: 'Business name is required.' });
       return;
     }
 
@@ -195,6 +197,9 @@ export default function AdminPage() {
     form.append('status', status);
     if (logoFile) form.append('logo', logoFile);
 
+    setSponsorSaving(true);
+    setSponsorNotice(null);
+
     try {
       await api.createSponsor(form);
 
@@ -205,9 +210,16 @@ export default function AdminPage() {
       setStatus('active');
       setLogoFile(null);
       setError('');
+      setSponsorNotice({ tone: 'success', text: 'Sponsor saved.' });
       await fetchSponsors();
     } catch (e) {
+      setSponsorNotice({
+        tone: 'error',
+        text: e instanceof Error ? e.message : 'Unable to create sponsor',
+      });
       setError(e instanceof Error ? e.message : 'Unable to create sponsor');
+    } finally {
+      setSponsorSaving(false);
     }
   };
 
@@ -628,7 +640,21 @@ export default function AdminPage() {
                   <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" />
                 </label>
 
-                <button className="w-full rounded-full bg-[#22C55E] text-[#0B0B0B] font-black py-3 hover:bg-[#16A34A] hover:text-white transition-colors">Save Sponsor</button>
+                <button type="submit" disabled={sponsorSaving} className="w-full rounded-full bg-[#22C55E] text-[#0B0B0B] font-black py-3 hover:bg-[#16A34A] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  {sponsorSaving ? 'Saving...' : 'Save Sponsor'}
+                </button>
+
+                {sponsorNotice && (
+                  <div
+                    className={
+                      sponsorNotice.tone === 'success'
+                        ? 'rounded-xl border border-[#22C55E]/50 bg-[#22C55E]/10 px-4 py-3 text-sm text-[#A7F3D0]'
+                        : 'rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-200'
+                    }
+                  >
+                    {sponsorNotice.text}
+                  </div>
+                )}
               </form>
             </div>
           </section>
