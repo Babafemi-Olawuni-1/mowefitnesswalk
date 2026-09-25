@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "node --watch src/server.js",
+    "build": "node --version",
     "start": "node src/server.js",
     "test": "node --test --test-concurrency=1 test/*.test.js",
     "migrate": "node scripts/migrate.js",
