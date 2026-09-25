@@ -11,6 +11,8 @@ import {
   downloadBlob,
   type Sponsor,
   type VerifyResult,
+  type GalleryItem,
+  type AdminUser,
 } from '@/lib/api';
 
 type DashboardStats = {
@@ -42,14 +44,24 @@ export default function AdminPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
-  const [verificationResult, setVerificationResult] = useState<VerifyResult | null>(null);
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [galleryCaption, setGalleryCaption] = useState('');
+  const [galleryCategory, setGalleryCategory] = useState('general');
+  const [galleryStatus, setGalleryStatus] = useState('active');
+  const [galleryFile, setGalleryFile] = useState<File | null>(null);
+  const [editingGalleryId, setEditingGalleryId] = useState<number | null>(null);
 
-  const [businessName, setBusinessName] = useState('');
-  const [websiteUrl, setWebsiteUrl] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [priority, setPriority] = useState('0');
-  const [status, setStatus] = useState('active');
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState<'super' | 'admin'>('admin');
+  const [showAdminModal, setShowAdminModal] = useState(false);
+
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailTarget, setEmailTarget] = useState<'all' | 'registered' | 'verified'>('all');
+  const [emailSending, setEmailSending] = useState(false);
 
   const scannerVideoRef = useRef<HTMLVideoElement | null>(null);
   const scannerStreamRef = useRef<MediaStream | null>(null);
@@ -112,9 +124,30 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchGallery = useCallback(async () => {
+    try {
+      setGalleryItems(await api.adminGallery());
+    } catch (e) {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        setError(e instanceof Error ? e.message : 'Unable to load gallery');
+      }
+    }
+  }, []);
+
+  const fetchAdmins = useCallback(async () => {
+    try {
+      setAdmins(await api.adminAdmins());
+    } catch (e) {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        // Not super admin - this is fine, just don't show the section
+        console.log('Not super admin or no access');
+      }
+    }
+  }, []);
+
   const loadAdminData = useCallback(async () => {
-    await Promise.all([fetchDashboard(), fetchParticipants(), fetchSponsors()]);
-  }, [fetchDashboard, fetchParticipants, fetchSponsors]);
+    await Promise.all([fetchDashboard(), fetchParticipants(), fetchSponsors(), fetchGallery(), fetchAdmins()]);
+  }, [fetchDashboard, fetchParticipants, fetchSponsors, fetchGallery, fetchAdmins]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +197,135 @@ export default function AdminPage() {
       await fetchSponsors();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create sponsor');
+    }
+  };
+
+  const handleSponsorDelete = async (id: number) => {
+    if (!confirm('Delete this sponsor?')) return;
+    try {
+      await api.deleteSponsor(id);
+      await fetchSponsors();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete sponsor');
+    }
+  };
+
+  const handleGalleryCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!galleryFile) {
+      setError('Please select an image.');
+      return;
+    }
+
+    const form = new FormData();
+    form.append('image', galleryFile);
+    if (galleryCaption.trim()) form.append('caption', galleryCaption.trim());
+    form.append('category', galleryCategory);
+    form.append('status', galleryStatus);
+
+    try {
+      await api.createGalleryItem(form);
+      setGalleryCaption('');
+      setGalleryCategory('general');
+      setGalleryStatus('active');
+      setGalleryFile(null);
+      setEditingGalleryId(null);
+      await fetchGallery();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to upload image');
+    }
+  };
+
+  const handleGalleryUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingGalleryId === null) return;
+
+    const form = new FormData();
+    if (galleryFile) form.append('image', galleryFile);
+    if (galleryCaption.trim()) form.append('caption', galleryCaption.trim());
+    form.append('category', galleryCategory);
+    form.append('status', galleryStatus);
+
+    try {
+      await api.updateGalleryItem(editingGalleryId, form);
+      setGalleryCaption('');
+      setGalleryCategory('general');
+      setGalleryStatus('active');
+      setGalleryFile(null);
+      setEditingGalleryId(null);
+      await fetchGallery();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update image');
+    }
+  };
+
+  const handleGalleryDelete = async (id: number) => {
+    if (!confirm('Delete this gallery image?')) return;
+    try {
+      await api.deleteGalleryItem(id);
+      await fetchGallery();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete image');
+    }
+  };
+
+  const startEditGallery = (item: GalleryItem) => {
+    setEditingGalleryId(item.id);
+    setGalleryCaption(item.caption ?? '');
+    setGalleryCategory(item.category ?? 'general');
+    setGalleryStatus(item.status ?? 'active');
+    setGalleryFile(null);
+  };
+
+  const handleAdminCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminEmail || !newAdminPassword || !newAdminName) {
+      setError('All fields are required.');
+      return;
+    }
+    if (newAdminPassword.length < 12) {
+      setError('Password must be at least 12 characters.');
+      return;
+    }
+    try {
+      await api.createAdmin({ email: newAdminEmail, password: newAdminPassword, name: newAdminName, role: newAdminRole });
+      setNewAdminEmail('');
+      setNewAdminPassword('');
+      setNewAdminName('');
+      setNewAdminRole('admin');
+      setShowAdminModal(false);
+      await fetchAdmins();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to create admin');
+    }
+  };
+
+  const handleAdminDelete = async (id: string) => {
+    if (!confirm('Delete this admin? This cannot be undone.')) return;
+    try {
+      await api.deleteAdmin(id);
+      await fetchAdmins();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete admin');
+    }
+  };
+
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailSubject.trim() || !emailMessage.trim()) {
+      setError('Subject and message are required.');
+      return;
+    }
+    setEmailSending(true);
+    try {
+      const result = await api.sendEmail({ subject: emailSubject, message: emailMessage, target: emailTarget });
+      setEmailSubject('');
+      setEmailMessage('');
+      setError(`Email sent to ${result.sent} participant(s). Failed: ${result.failed}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to send email');
+    } finally {
+      setEmailSending(false);
     }
   };
 
@@ -530,11 +692,152 @@ export default function AdminPage() {
                     {s.logo_url && <img src={s.logo_url} alt={s.business_name} className="h-16 object-contain rounded-lg border border-white/10 bg-white" />}
                     <div className="mt-3 font-bold text-white">{s.business_name}</div>
                     {s.website_url && <a href={s.website_url} target="_blank" className="text-sm text-[#22C55E] hover:text-[#86EFAC]">Visit website</a>}
+                    <button onClick={() => handleSponsorDelete(s.id)} className="mt-3 w-full rounded-full border border-red-500/50 text-red-300 py-2 hover:bg-red-500/10 transition-colors text-sm">Delete Sponsor</button>
                   </div>
                 ))}
               </div>
             </section>
           </section>
+
+          {/* Gallery */}
+          <section className="grid grid-cols-1 xl:grid-cols-[1fr_0.9fr] gap-6 mt-6">
+            <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-2xl font-black">Gallery</h2>
+              </div>
+              <form onSubmit={editingGalleryId ? handleGalleryUpdate : handleGalleryCreate} className="space-y-4 mb-6">
+                <label className="block">
+                  <span className="text-xs uppercase tracking-widest text-gray-400">Image</span>
+                  <input type="file" accept="image/*" onChange={(e) => setGalleryFile(e.target.files?.[0] ?? null)} required={!editingGalleryId} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" />
+                  {editingGalleryId && <p className="text-xs text-gray-500 mt-1">Leave empty to keep current image</p>}
+                </label>
+                <label className="block">
+                  <span className="text-xs uppercase tracking-widest text-gray-400">Caption</span>
+                  <input value={galleryCaption} onChange={(e) => setGalleryCaption(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" placeholder="Optional caption" />
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="text-xs uppercase tracking-widest text-gray-400">Category</span>
+                    <input value={galleryCategory} onChange={(e) => setGalleryCategory(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" placeholder="general" />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs uppercase tracking-widest text-gray-400">Status</span>
+                    <select value={galleryStatus} onChange={(e) => setGalleryStatus(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3">
+                      <option value="active">active</option>
+                      <option value="inactive">inactive</option>
+                    </select>
+                  </label>
+                </div>
+                <button type="submit" className="w-full rounded-full bg-[#22C55E] text-[#0B0B0B] font-black py-3 hover:bg-[#16A34A] hover:text-white transition-colors">
+                  {editingGalleryId ? 'Update Image' : 'Add Image'}
+                </button>
+                {editingGalleryId && (
+                  <button type="button" onClick={() => { setEditingGalleryId(null); setGalleryCaption(''); setGalleryCategory('general'); setGalleryStatus('active'); setGalleryFile(null); }} className="w-full rounded-full border border-white/10 hover:bg-white/10 py-3">Cancel Edit</button>
+                )}
+              </form>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {galleryItems.map((item) => (
+                  <div key={item.id} className="rounded-2xl border border-white/10 bg-black/30 p-3 flex flex-col">
+                    <img src={item.image_url} alt={item.caption ?? ''} className="h-32 object-cover rounded-lg border border-white/10" />
+                    <div className="mt-3 flex-1">
+                      {item.caption && <div className="font-bold text-white text-sm">{item.caption}</div>}
+                      <div className="text-xs text-gray-400 mt-1">{item.category ?? 'general'} · {item.status ?? 'active'}</div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button onClick={() => startEditGallery(item)} className="flex-1 rounded-full border border-white/10 hover:bg-white/10 py-2 text-sm">Edit</button>
+                      <button onClick={() => handleGalleryDelete(item.id)} className="flex-1 rounded-full border border-red-500/50 text-red-300 py-2 hover:bg-red-500/10 transition-colors text-sm">Delete</button>
+                    </div>
+                  </div>
+                ))}
+                {galleryItems.length === 0 && (
+                  <div className="col-span-full text-center py-8 text-gray-500">No gallery images yet</div>
+                )}
+              </div>
+            </section>
+
+            {/* Admin Users (super only) */}
+            {admins.length > 0 && (
+              <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-2xl font-black">Admin Users</h2>
+                  <button onClick={() => setShowAdminModal(true)} className="px-4 py-2 rounded-full bg-[#22C55E] text-[#0B0B0B] font-black hover:bg-[#16A34A] hover:text-white transition-colors">Add Admin</button>
+                </div>
+                <div className="space-y-3">
+                  {admins.map((a) => (
+                    <div key={a.id} className="rounded-2xl border border-white/10 bg-black/30 p-4 flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-white">{a.name}</div>
+                        <div className="text-sm text-gray-400">{a.email}</div>
+                        <span className="rounded-full px-2 py-1 bg-[#22C55E]/20 border border-[#22C55E]/30 text-xs text-[#A7F3D0] ml-2">{a.role}</span>
+                      </div>
+                      {a.id !== token && (
+                        <button onClick={() => handleAdminDelete(a.id)} className="rounded-full border border-red-500/50 text-red-300 px-4 py-2 hover:bg-red-500/10 transition-colors text-sm">Delete</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Email Broadcast */}
+            <section className="rounded-3xl border border-white/10 bg-white/5 p-6 mt-6">
+              <h2 className="text-2xl font-black mb-5">Send Email to Participants</h2>
+              <form onSubmit={handleSendEmail} className="space-y-4">
+                <label className="block">
+                  <span className="text-xs uppercase tracking-widest text-gray-400">Subject</span>
+                  <input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} required className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" />
+                </label>
+                <label className="block">
+                  <span className="text-xs uppercase tracking-widest text-gray-400">Message</span>
+                  <textarea value={emailMessage} onChange={(e) => setEmailMessage(e.target.value)} required rows={6} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" />
+                </label>
+                <label className="block">
+                  <span className="text-xs uppercase tracking-widest text-gray-400">Target</span>
+                  <select value={emailTarget} onChange={(e) => setEmailTarget(e.target.value as 'all' | 'registered' | 'verified')} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3">
+                    <option value="all">All Participants</option>
+                    <option value="registered">Registered Only</option>
+                    <option value="verified">Verified Only</option>
+                  </select>
+                </label>
+                <button type="submit" disabled={emailSending} className="w-full rounded-full bg-[#22C55E] text-[#0B0B0B] font-black py-3 hover:bg-[#16A34A] hover:text-white transition-colors disabled:opacity-50">
+                  {emailSending ? 'Sending...' : 'Send Email'}
+                </button>
+              </form>
+            </section>
+
+            {/* Add Admin Modal */}
+            {showAdminModal && (
+              <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-6 w-full max-w-md">
+                  <h3 className="text-2xl font-black mb-5">Create Admin</h3>
+                  <form onSubmit={handleAdminCreate} className="space-y-4">
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-widest text-gray-400">Name</span>
+                      <input value={newAdminName} onChange={(e) => setNewAdminName(e.target.value)} required className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-widest text-gray-400">Email</span>
+                      <input type="email" value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} required className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-widest text-gray-400">Password (min 12 chars)</span>
+                      <input type="password" value={newAdminPassword} onChange={(e) => setNewAdminPassword(e.target.value)} required minLength={12} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3" />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-widest text-gray-400">Role</span>
+                      <select value={newAdminRole} onChange={(e) => setNewAdminRole(e.target.value as 'super' | 'admin')} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3">
+                        <option value="admin">Admin</option>
+                        <option value="super">Super Admin</option>
+                      </select>
+                    </label>
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => setShowAdminModal(false)} className="flex-1 rounded-full border border-white/10 hover:bg-white/10 py-3">Cancel</button>
+                      <button type="submit" className="flex-1 rounded-full bg-[#22C55E] text-[#0B0B0B] font-black py-3 hover:bg-[#16A34A] hover:text-white transition-colors">Create Admin</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
         </main>
       )}
     </div>

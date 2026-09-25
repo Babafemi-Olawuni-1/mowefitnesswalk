@@ -228,6 +228,16 @@ export type AdminUser = {
   role: string;
 };
 
+export type GalleryItem = {
+  id: number;
+  image_url: string;
+  caption?: string | null;
+  category?: string;
+  sort_order?: number;
+  status?: string;
+  uploaded_at?: string;
+};
+
 export const api = {
   // Public
   register: (formData: FormData) =>
@@ -238,7 +248,7 @@ export const api = {
 
   sponsors: () => apiFetch<Sponsor[]>('/sponsors', { auth: false }),
 
-  gallery: () => apiFetch<unknown[]>('/gallery', { auth: false }),
+  gallery: () => apiFetch<GalleryItem[]>('/gallery', { auth: false }),
 
   event: () => apiFetch<Record<string, unknown>>('/event', { auth: false }),
 
@@ -285,6 +295,37 @@ export const api = {
 
   createSponsor: (formData: FormData) =>
     apiFetch<{ id: number }>('/admin/sponsors', { method: 'POST', formData }),
+
+  deleteSponsor: (id: number) =>
+    apiFetch<null>(`/admin/sponsors/${id}`, { method: 'DELETE' }),
+
+  // Gallery
+  adminGallery: () => apiFetch<GalleryItem[]>('/admin/gallery'),
+
+  createGalleryItem: (formData: FormData) =>
+    apiFetch<{ id: number }>('/admin/gallery', { method: 'POST', formData }),
+
+  updateGalleryItem: (id: number, formData: FormData) =>
+    apiFetch<{ id: number }>(`/admin/gallery/${id}`, { method: 'PUT', formData }),
+
+  deleteGalleryItem: (id: number) =>
+    apiFetch<null>(`/admin/gallery/${id}`, { method: 'DELETE' }),
+
+  // Admin users (super only)
+  adminAdmins: () => apiFetch<AdminUser[]>('/admin/admins'),
+
+  createAdmin: (body: { email: string; password: string; name: string; role?: string }) =>
+    apiFetch<AdminUser>('/admin/admins', { method: 'POST', body }),
+
+  updateAdmin: (id: string, body: { name?: string; role?: string }) =>
+    apiFetch<AdminUser>(`/admin/admins/${id}`, { method: 'PUT', body }),
+
+  deleteAdmin: (id: string) =>
+    apiFetch<null>(`/admin/admins/${id}`, { method: 'DELETE' }),
+
+  // Email broadcast
+  sendEmail: (body: { subject: string; message: string; target?: 'all' | 'registered' | 'verified' | number[] }) =>
+    apiFetch<{ sent: number; failed: number; total: number }>('/admin/email/send', { method: 'POST', body }),
 
   exportUrl: (type: 'participants' | 'sponsors' | 'contacts') =>
     `${API_URL}/admin/export/${type}`,
