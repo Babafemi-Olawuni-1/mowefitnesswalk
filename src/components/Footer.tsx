@@ -83,8 +83,20 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto pt-6 sm:pt-8 border-t border-white/10 text-center text-xs sm:text-sm text-gray-500">
-        © 2026 Mowe Fitness Walk. All rights reserved.
+      <div className="max-w-7xl mx-auto pt-6 sm:pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-gray-500">
+        <span>© 2026 Mowe Fitness Walk. All rights reserved.</span>
+        <a
+          href="https://olawunibabafemi.netlify.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-gray-500 hover:text-[#22C55E] transition-colors group"
+        >
+          <span>Developed by</span>
+          <span className="font-semibold text-gray-400 group-hover:text-[#22C55E] transition-colors">
+            FemTech Technologies
+          </span>
+          <ExternalLink size={11} className="opacity-60 group-hover:opacity-100 transition-opacity" />
+        </a>
       </div>
     </footer>
   );
