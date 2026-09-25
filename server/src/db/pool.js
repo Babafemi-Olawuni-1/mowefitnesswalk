@@ -20,14 +20,22 @@ let pool = null;
 export function getPool() {
   if (pool) return pool;
 
+  const isRemote =
+    config.DATABASE_URL.includes('supabase') ||
+    config.DATABASE_URL.includes('sslmode') ||
+    config.isProduction;
+
+  // If remote (e.g. Supabase), strip ?sslmode=... so pg's internal parser doesn't override rejectUnauthorized: false
+  const connectionString = isRemote
+    ? config.DATABASE_URL.replace(/[?&]sslmode=[^&]*/g, '').replace(/[?&]$/, '')
+    : config.DATABASE_URL;
+
   pool = new Pool({
-    connectionString: config.DATABASE_URL,
+    connectionString,
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    ssl: config.DATABASE_URL.includes('supabase') || config.DATABASE_URL.includes('sslmode') || config.isProduction
-      ? { rejectUnauthorized: false }
-      : undefined,
+    ssl: isRemote ? { rejectUnauthorized: false } : undefined,
   });
 
   pool.on('error', (error) => {
