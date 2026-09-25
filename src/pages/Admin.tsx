@@ -57,6 +57,7 @@ export default function AdminPage() {
   const [sponsorNotice, setSponsorNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [galleryBroken, setGalleryBroken] = useState<Record<number, boolean>>({});
   const [galleryCaption, setGalleryCaption] = useState('');
   const [galleryCategory, setGalleryCategory] = useState('general');
   const [galleryStatus, setGalleryStatus] = useState('active');
@@ -142,6 +143,7 @@ export default function AdminPage() {
   const fetchGallery = useCallback(async () => {
     try {
       setGalleryItems(await api.adminGallery());
+      setGalleryBroken({});
     } catch (e) {
       if (!(e instanceof ApiError && e.status === 401)) {
         setError(e instanceof Error ? e.message : 'Unable to load gallery');
@@ -779,7 +781,23 @@ export default function AdminPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {galleryItems.map((item) => (
                   <div key={item.id} className="rounded-2xl border border-white/10 bg-black/30 p-3 flex flex-col">
-                    <img src={item.image_url} alt={item.caption ?? ''} className="h-32 object-cover rounded-lg border border-white/10" />
+                    <div className="h-40 w-full rounded-lg border border-white/10 bg-black/40 flex items-center justify-center overflow-hidden">
+                      {galleryBroken[item.id] ? (
+                        <span className="px-3 text-center text-xs text-red-300">
+                          Image could not be loaded
+                        </span>
+                      ) : (
+                        <img
+                          src={item.image_url ?? undefined}
+                          alt={item.caption ?? 'Gallery image'}
+                          loading="lazy"
+                          onError={() =>
+                            setGalleryBroken((prev) => ({ ...prev, [item.id]: true }))
+                          }
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      )}
+                    </div>
                     <div className="mt-3 flex-1">
                       {item.caption && <div className="font-bold text-white text-sm">{item.caption}</div>}
                       <div className="text-xs text-gray-400 mt-1">{item.category ?? 'general'} · {item.status ?? 'active'}</div>
