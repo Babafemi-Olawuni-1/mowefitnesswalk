@@ -75,6 +75,10 @@ export function createApp() {
   app.use('/api', publicRoutes);
   app.use('/api/admin', adminRoutes);
 
+  // Fallback mounts without /api prefix so /admin/* and /* requests work seamlessly
+  app.use('/admin', adminRoutes);
+  app.use('/', publicRoutes);
+
   // Convenience alias so /api/health works as well as /health.
   app.get('/api/health', health);
 

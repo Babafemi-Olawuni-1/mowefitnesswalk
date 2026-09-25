@@ -9,10 +9,12 @@
  * VITE_ variable.
  */
 
-const rawBase = import.meta.env.VITE_API_URL ?? '';
+const trimmedBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
-/** Trim any trailing slash so `${API_URL}/sponsors` is always well formed. */
-export const API_URL = rawBase.replace(/\/+$/, '');
+/** Ensure base URL always includes the /api prefix */
+export const API_URL = trimmedBase && !trimmedBase.endsWith('/api')
+  ? `${trimmedBase}/api`
+  : trimmedBase;
 
 export const ADMIN_TOKEN_KEY = 'admin_token';
 
