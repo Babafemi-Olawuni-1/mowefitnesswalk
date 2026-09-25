@@ -133,39 +133,49 @@ export async function register({ fullName, email, phone, photoBuffer, photoMime,
     logger.error({ err: error, participantId }, 'pass/QR generation failed; registration kept');
   }
 
-  // ── 9-10. email ───────────────────────────────────────────────────────
+  // ── 9. build the response immediately — the user should not wait for email ─
   const verifyUrl = buildVerificationUrl(participantId);
-  let emailStatus = 'failed';
 
-  try {
-    const event = await eventModel.getEvent();
-    const result = await sendRegistrationConfirmation({
-      participant: { ...participant, registered_at: formatDate(participant.registered_at) },
-      verifyUrl,
-      passBuffer,
-      passFilename: passFilename(participantId),
-      eventName: event?.event_name ?? DEFAULT_EVENT_NAME,
-    });
-    emailStatus = result.ok ? 'sent' : 'failed';
-  } catch (error) {
-    logger.error({ err: error, participantId }, 'registration email threw');
-  }
-
-  await eventModel
-    .logEmail({ recipient: email, subject: 'Registration Confirmed', status: emailStatus })
-    .catch((error) => logger.error({ err: error }, 'could not write email_log'));
-
-  logger.info({ participantId, emailStatus }, 'registration complete');
-
-  return {
+  const result = {
     participant_id: participantId,
     full_name: participant.full_name,
     registered_at: participant.registered_at,
     pass_url: passUrl,
     qr_url: qrUrl,
     verify_url: verifyUrl,
-    email_status: emailStatus,
+    email_status: 'queued',
   };
+
+  // ── 10. send the email in the background so the HTTP response is instant ──
+  setImmediate(async () => {
+    let emailStatus = 'failed';
+    try {
+      const event = await eventModel.getEvent();
+      const sent = await sendRegistrationConfirmation({
+        participant: { ...participant, registered_at: formatDate(participant.registered_at) },
+        verifyUrl,
+        passBuffer,
+        passFilename: passFilename(participantId),
+        eventName: event?.event_name ?? DEFAULT_EVENT_NAME,
+      });
+      emailStatus = sent.ok ? 'sent' : 'failed';
+      if (!sent.ok) {
+        logger.error({ participantId, error: sent.error }, 'registration email delivery failed');
+      } else {
+        logger.info({ participantId, messageId: sent.messageId }, 'registration email sent');
+      }
+    } catch (error) {
+      logger.error({ err: error, participantId }, 'registration email threw');
+    }
+
+    await eventModel
+      .logEmail({ recipient: email, subject: 'Registration Confirmed', status: emailStatus })
+      .catch((error) => logger.error({ err: error }, 'could not write email_log'));
+
+    logger.info({ participantId, emailStatus }, 'registration complete');
+  });
+
+  return result;
 }
 
 /**
