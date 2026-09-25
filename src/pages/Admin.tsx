@@ -44,6 +44,16 @@ export default function AdminPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [verificationResult, setVerificationResult] = useState<VerifyResult | null>(null);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(null);
+
+  const [businessName, setBusinessName] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [priority, setPriority] = useState('0');
+  const [status, setStatus] = useState('active');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [galleryCaption, setGalleryCaption] = useState('');
   const [galleryCategory, setGalleryCategory] = useState('general');
@@ -76,6 +86,9 @@ export default function AdminPage() {
     setStats(null);
     setParticipants([]);
     setSponsors([]);
+    setAdmins([]);
+    setGalleryItems([]);
+    setCurrentAdmin(null);
     setVerificationResult(null);
   }, []);
 
@@ -137,11 +150,8 @@ export default function AdminPage() {
   const fetchAdmins = useCallback(async () => {
     try {
       setAdmins(await api.adminAdmins());
-    } catch (e) {
-      if (!(e instanceof ApiError && e.status === 401)) {
-        // Not super admin - this is fine, just don't show the section
-        console.log('Not super admin or no access');
-      }
+    } catch {
+      setAdmins([]);
     }
   }, []);
 
@@ -158,6 +168,7 @@ export default function AdminPage() {
       const data = await api.login(loginEmail.trim(), loginPassword);
       setStoredToken(data.token);
       setToken(data.token);
+      setCurrentAdmin(data.admin ?? null);
       setLoginPassword('');
       await loadAdminData();
     } catch (e) {
@@ -754,9 +765,10 @@ export default function AdminPage() {
                 )}
               </div>
             </section>
+          </section>
 
-            {/* Admin Users (super only) */}
-            {admins.length > 0 && (
+          {/* Admin Users (super only) */}
+          {admins.length > 0 && (
               <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="text-2xl font-black">Admin Users</h2>
@@ -770,7 +782,7 @@ export default function AdminPage() {
                         <div className="text-sm text-gray-400">{a.email}</div>
                         <span className="rounded-full px-2 py-1 bg-[#22C55E]/20 border border-[#22C55E]/30 text-xs text-[#A7F3D0] ml-2">{a.role}</span>
                       </div>
-                      {a.id !== token && (
+                      {a.id !== currentAdmin?.id && (
                         <button onClick={() => handleAdminDelete(a.id)} className="rounded-full border border-red-500/50 text-red-300 px-4 py-2 hover:bg-red-500/10 transition-colors text-sm">Delete</button>
                       )}
                     </div>
