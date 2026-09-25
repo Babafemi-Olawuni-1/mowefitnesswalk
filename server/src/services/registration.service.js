@@ -147,10 +147,13 @@ export async function register({ fullName, email, phone, photoBuffer, photoMime,
   };
 
   // ── 10. send the email in the background so the HTTP response is instant ──
+  logger.info({ participantId }, 'starting background email send');
   setImmediate(async () => {
+    logger.info({ participantId }, 'inside setImmediate callback');
     let emailStatus = 'failed';
     try {
       const event = await eventModel.getEvent();
+      logger.info({ participantId, event: event?.event_name }, 'got event for email');
       const sent = await sendRegistrationConfirmation({
         participant: { ...participant, registered_at: formatDate(participant.registered_at) },
         verifyUrl,
