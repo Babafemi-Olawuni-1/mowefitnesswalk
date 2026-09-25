@@ -9,7 +9,8 @@ import { login } from '../controllers/auth.controller.js';
 import * as participants from '../controllers/admin.participant.controller.js';
 import * as content from '../controllers/admin.content.controller.js';
 import * as mail from '../controllers/admin.email.controller.js';
-import { requireAdmin } from '../middleware/auth.js';
+import * as users from '../controllers/admin.user.controller.js';
+import { requireAdmin, requireRole } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { singleImage } from '../middleware/upload.js';
 
@@ -53,6 +54,12 @@ router.delete('/contacts/:id', content.deleteContact);
 // Event settings
 router.get('/event', content.getEvent);
 router.put('/event', singleImage('banner'), content.updateEvent);
+
+// Admin users (super only)
+router.get('/admins', requireRole('super'), users.listAdmins);
+router.post('/admins', requireRole('super'), users.createAdmin);
+router.put('/admins/:id', requireRole('super'), users.updateAdmin);
+router.delete('/admins/:id', requireRole('super'), users.deleteAdmin);
 
 // Email broadcast
 router.post('/email/send', mail.sendEmail);

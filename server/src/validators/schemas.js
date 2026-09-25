@@ -161,6 +161,22 @@ export const broadcastSchema = z.object({
     .default('all'),
 });
 
+export const adminCreateSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(12, 'Password must be at least 12 characters.').max(200),
+  name: nameSchema,
+  role: z.enum(['super', 'admin']).optional().default('admin'),
+});
+
+export const adminUpdateSchema = z
+  .object({
+    name: nameSchema.optional(),
+    role: z.enum(['super', 'admin']).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'No valid fields to update.',
+  });
+
 /** Normalise a multipart body into a plain object of strings. */
 export function bodyToStrings(body = {}) {
   const result = {};
